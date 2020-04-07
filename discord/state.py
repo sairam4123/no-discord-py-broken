@@ -1039,6 +1039,7 @@ class AutoShardedConnectionState(ConnectionState):
         super().__init__(*args, **kwargs)
         self._ready_task = None
         self.shard_ids = ()
+        self.shards_launched = asyncio.Event()
 
     async def request_offline_members(self, guilds, *, shard_id):
         # get all the chunks
@@ -1061,6 +1062,7 @@ class AutoShardedConnectionState(ConnectionState):
                 log.info('Finished requesting guild member chunks for %d guilds.', len(guilds))
 
     async def _delay_ready(self):
+        await self.shards_launched.wait()
         launch = self._ready_state.launch
         while True:
             # this snippet of code is basically waiting 2 * shard_ids seconds
