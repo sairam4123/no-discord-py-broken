@@ -62,7 +62,7 @@ log = logging.getLogger(__name__)
 ReadyState = namedtuple('ReadyState', ('launch', 'guilds'))
 
 class ConnectionState:
-    def __init__(self, *, dispatch, chunker, handlers, syncer, http, loop, **options):
+    def __init__(self, *, dispatch, chunker, handlers, hooks, syncer, http, loop, **options):
         self.loop = loop
         self.http = http
         self.max_messages = options.get('max_messages', 1000)
@@ -74,6 +74,7 @@ class ConnectionState:
         self.syncer = syncer
         self.is_bot = None
         self.handlers = handlers
+        self.hooks = hooks
         self.shard_count = None
         self._ready_task = None
         self._fetch_offline = options.get('fetch_offline_members', True)
@@ -165,6 +166,14 @@ class ConnectionState:
             pass
         else:
             func(*args, **kwargs)
+
+    async def call_hooks(self, key, *args, **kwargs):
+        try:
+            coro = self.hooks[key]
+        except KeyError:
+            pass
+        else:
+            await coro(*args, **kwargs)
 
     @property
     def self_id(self):
