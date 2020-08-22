@@ -911,7 +911,7 @@ class BotBase(GroupMixin):
             exc = errors.CommandNotFound('Command "{}" is not found'.format(ctx.invoked_with))
             self.dispatch('command_error', ctx, exc)
 
-    async def process_commands(self, message, cls=Context):
+    async def process_commands(self, message, *, cls=Context):
         """|coro|
 
         This function processes the commands that have been registered
