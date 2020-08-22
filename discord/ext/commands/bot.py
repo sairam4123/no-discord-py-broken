@@ -933,10 +933,11 @@ class BotBase(GroupMixin):
         message: :class:`discord.Message`
             The message to process commands for.
         cls
-            The factory class that will be used to create the context.
+            The factory class that will be used to process the commands.
             By default, this is :class:`.Context`. Should a custom
             class be provided, it must be similar enough to :class:`.Context`\'s
             interface.
+            .. versionadded:: 1.5
         """
         if message.author.bot:
             return
