@@ -39,7 +39,7 @@ default = _FakeBool()
 class AllowedMentions:
     """A class that represents what mentions are allowed in a message.
 
-    This class can be set during :class:`Client` initialization to apply
+    This class can be set during :class:`Client` initialisation to apply
     to every message sent. It can also be applied on a per message basis
     via :meth:`abc.Messageable.send` for more fine-grained control.
 
@@ -96,3 +96,6 @@ class AllowedMentions:
         users = self.users if other.users is default else other.users
         roles = self.roles if other.roles is default else other.roles
         return AllowedMentions(everyone=everyone, roles=roles, users=users)
+
+    def __repr__(self):
+        return '{0.__class__.__qualname__}(everyone={0.everyone}, users={0.users}, roles={0.roles})'.format(self)

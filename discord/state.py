@@ -35,6 +35,8 @@ import weakref
 import inspect
 import gc
 
+import os
+
 from .guild import Guild
 from .activity import BaseActivity
 from .user import User, ClientUser
@@ -62,7 +64,7 @@ log = logging.getLogger(__name__)
 ReadyState = namedtuple('ReadyState', ('launch', 'guilds'))
 
 class ConnectionState:
-    def __init__(self, *, dispatch, chunker, handlers, syncer, http, loop, **options):
+    def __init__(self, *, dispatch, handlers, hooks, syncer, http, loop, **options):
         self.loop = loop
         self.http = http
         self.max_messages = options.get('max_messages', 1000)
@@ -70,14 +72,18 @@ class ConnectionState:
             self.max_messages = 1000
 
         self.dispatch = dispatch
-        self.chunker = chunker
         self.syncer = syncer
         self.is_bot = None
         self.handlers = handlers
+        self.hooks = hooks
         self.shard_count = None
         self._ready_task = None
         self._fetch_offline = options.get('fetch_offline_members', True)
         self.heartbeat_timeout = options.get('heartbeat_timeout', 60.0)
+        self.guild_ready_timeout = options.get('guild_ready_timeout', 2.0)
+        if self.guild_ready_timeout < 0:
+            raise ValueError('guild_ready_timeout cannot be negative')
+
         self.guild_subscriptions = options.get('guild_subscriptions', True)
         allowed_mentions = options.get('allowed_mentions')
 
@@ -132,6 +138,9 @@ class ConnectionState:
         # to reconnect loops which cause mass allocations and deallocations.
         gc.collect()
 
+    def get_nonce(self):
+        return os.urandom(16).hex()
+
     def process_listeners(self, listener_type, argument, result):
         removed = []
         for i, listener in enumerate(self._listeners):
@@ -165,6 +174,14 @@ class ConnectionState:
             pass
         else:
             func(*args, **kwargs)
+
+    async def call_hooks(self, key, *args, **kwargs):
+        try:
+            coro = self.hooks[key]
+        except KeyError:
+            pass
+        else:
+            await coro(*args, **kwargs)
 
     @property
     def self_id(self):
@@ -298,6 +315,10 @@ class ConnectionState:
 
         return channel or Object(id=channel_id), guild
 
+    async def chunker(self, guild_id, query='', limit=0, *, nonce=None):
+        ws = self._get_websocket(guild_id) # This is ignored upstream
+        await ws.request_chunks(guild_id, query=query, limit=limit, nonce=nonce)
+
     async def request_offline_members(self, guilds):
         # get all the chunks
         chunks = []
@@ -307,7 +328,7 @@ class ConnectionState:
         # we only want to request ~75 guilds per chunk request.
         splits = [guilds[i:i + 75] for i in range(0, len(guilds), 75)]
         for split in splits:
-            await self.chunker(split)
+            await self.chunker([g.id for g in split])
 
         # wait for the chunks
         if chunks:
@@ -318,7 +339,7 @@ class ConnectionState:
             else:
                 log.info('Finished requesting guild member chunks for %d guilds.', len(guilds))
 
-    async def query_members(self, guild, query, limit, cache):
+    async def query_members(self, guild, query, limit, user_ids, cache):
         guild_id = guild.id
         ws = self._get_websocket(guild_id)
         if ws is None:
@@ -329,10 +350,11 @@ class ConnectionState:
         # and they don't receive GUILD_MEMBER events which make computing
         # member_count impossible. The only way to fix it is by limiting
         # the limit parameter to 1 to 1000.
-        future = self.receive_member_query(guild_id, query)
+        nonce = self.get_nonce()
+        future = self.receive_member_query(guild_id, nonce)
         try:
             # start the query operation
-            await ws.request_chunks(guild_id, query, limit)
+            await ws.request_chunks(guild_id, query=query, limit=limit, user_ids=user_ids, nonce=nonce)
             members = await asyncio.wait_for(future, timeout=5.0)
 
             if cache:
@@ -351,10 +373,10 @@ class ConnectionState:
             # only real bots wait for GUILD_CREATE streaming
             if self.is_bot:
                 while True:
-                    # this snippet of code is basically waiting 2 seconds
+                    # this snippet of code is basically waiting N seconds
                     # until the last GUILD_CREATE was sent
                     try:
-                        await asyncio.wait_for(launch.wait(), timeout=2.0)
+                        await asyncio.wait_for(launch.wait(), timeout=self.guild_ready_timeout)
                     except asyncio.TimeoutError:
                         break
                     else:
@@ -738,7 +760,7 @@ class ConnectionState:
 
     async def _chunk_and_dispatch(self, guild, unavailable):
         chunks = list(self.chunks_needed(guild))
-        await self.chunker(guild)
+        await self.chunker(guild.id)
         if chunks:
             try:
                 await utils.sane_wait_for(chunks, timeout=len(chunks))
@@ -894,8 +916,7 @@ class ConnectionState:
                     guild._add_member(member)
 
         self.process_listeners(ListenerType.chunk, guild, len(members))
-        names = [x.name.lower() for x in members]
-        self.process_listeners(ListenerType.query_members, (guild_id, names), members)
+        self.process_listeners(ListenerType.query_members, (guild_id, data.get('nonce')), members)
 
     def parse_guild_integrations_update(self, data):
         guild = self._get_guild(int(data['guild_id']))
@@ -1025,10 +1046,10 @@ class ConnectionState:
         self._listeners.append(listener)
         return future
 
-    def receive_member_query(self, guild_id, query):
-        def predicate(args, *, guild_id=guild_id, query=query.lower()):
-            request_guild_id, names = args
-            return request_guild_id == guild_id and all(n.startswith(query) for n in names)
+    def receive_member_query(self, guild_id, nonce):
+        def predicate(args, *, guild_id=guild_id, nonce=nonce):
+            return args == (guild_id, nonce)
+
         future = self.loop.create_future()
         listener = Listener(ListenerType.query_members, future, predicate)
         self._listeners.append(listener)
@@ -1039,6 +1060,22 @@ class AutoShardedConnectionState(ConnectionState):
         super().__init__(*args, **kwargs)
         self._ready_task = None
         self.shard_ids = ()
+        self.shards_launched = asyncio.Event()
+
+    def _update_message_references(self):
+        for msg in self._messages:
+            if not msg.guild:
+                continue
+
+            new_guild = self._get_guild(msg.guild.id)
+            if new_guild is not None and new_guild is not msg.guild:
+                channel_id = msg.channel.id
+                channel = new_guild.get_channel(channel_id) or Object(id=channel_id)
+                msg._rebind_channel_reference(channel)
+
+    async def chunker(self, guild_id, query='', limit=0, *, shard_id=None, nonce=None):
+        ws = self._get_websocket(guild_id, shard_id=shard_id)
+        await ws.request_chunks(guild_id, query=query, limit=limit, nonce=nonce)
 
     async def request_offline_members(self, guilds, *, shard_id):
         # get all the chunks
@@ -1049,7 +1086,7 @@ class AutoShardedConnectionState(ConnectionState):
         # we only want to request ~75 guilds per chunk request.
         splits = [guilds[i:i + 75] for i in range(0, len(guilds), 75)]
         for split in splits:
-            await self.chunker(split, shard_id=shard_id)
+            await self.chunker([g.id for g in split], shard_id=shard_id)
 
         # wait for the chunks
         if chunks:
@@ -1061,12 +1098,13 @@ class AutoShardedConnectionState(ConnectionState):
                 log.info('Finished requesting guild member chunks for %d guilds.', len(guilds))
 
     async def _delay_ready(self):
+        await self.shards_launched.wait()
         launch = self._ready_state.launch
         while True:
-            # this snippet of code is basically waiting 2 * shard_ids seconds
+            # this snippet of code is basically waiting N seconds
             # until the last GUILD_CREATE was sent
             try:
-                await asyncio.wait_for(launch.wait(), timeout=2.0 * len(self.shard_ids))
+                await asyncio.wait_for(launch.wait(), timeout=self.guild_ready_timeout)
             except asyncio.TimeoutError:
                 break
             else:
@@ -1114,10 +1152,27 @@ class AutoShardedConnectionState(ConnectionState):
             if guild.large:
                 guilds.append((guild, guild.unavailable))
 
+        if self._messages:
+            self._update_message_references()
+
         for pm in data.get('private_channels', []):
             factory, _ = _channel_factory(pm['type'])
             self._add_private_channel(factory(me=user, data=pm, state=self))
 
         self.dispatch('connect')
+        self.dispatch('shard_connect', data['__shard_id__'])
+
+        # Much like clear(), if we have a massive deallocation
+        # then it's better to explicitly call the GC
+        # Note that in the original ready parsing code this was done
+        # implicitly via clear() but in the auto sharded client clearing
+        # the cache would have the consequence of clearing data on other
+        # shards as well.
+        gc.collect()
+
         if self._ready_task is None:
             self._ready_task = asyncio.ensure_future(self._delay_ready(), loop=self.loop)
+
+    def parse_resumed(self, data):
+        self.dispatch('resumed')
+        self.dispatch('shard_resumed', data['__shard_id__'])
