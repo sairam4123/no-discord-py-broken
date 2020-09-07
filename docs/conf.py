@@ -31,11 +31,12 @@ sys.path.append(os.path.abspath('extensions'))
 # extensions coming with Sphinx (named 'sphinx.ext.*') or your custom
 # ones.
 extensions = [
+    'builder',
     'sphinx.ext.autodoc',
     'sphinx.ext.extlinks',
     'sphinx.ext.intersphinx',
     'sphinx.ext.napoleon',
-    'sphinxcontrib.asyncio',
+    'sphinxcontrib_trio',
     'details',
     'exception_hierarchy'
 ]
@@ -230,7 +231,7 @@ html_static_path = ['_static']
 
 # The name of a javascript file (relative to the configuration directory) that
 # implements a search results scorer. If empty, the default will be used.
-#html_search_scorer = 'scorer.js'
+html_search_scorer = '_static/scorer.js'
 
 # Output file base name for HTML help builder.
 htmlhelp_basename = 'discord.pydoc'
