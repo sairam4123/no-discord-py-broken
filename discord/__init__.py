@@ -43,16 +43,18 @@ from .invite import Invite, PartialInviteChannel, PartialInviteGuild
 from .widget import Widget, WidgetMember, WidgetChannel
 from .object import Object
 from .reaction import Reaction
-from . import utils, opus, abc
+from . import utils, opus, abc, rtp
 from .enums import *
 from .embeds import Embed
 from .shard import AutoShardedClient
 from .player import *
+from .reader import *
 from .webhook import *
 from .voice_client import VoiceClient
 from .audit_logs import AuditLogChanges, AuditLogEntry, AuditLogDiff
 from .raw_models import *
 from .team import *
+from .speakingstate import SpeakingState
 
 VersionInfo = namedtuple('VersionInfo', 'major minor micro releaselevel serial')
 
@@ -66,3 +68,32 @@ except ImportError:
             pass
 
 logging.getLogger(__name__).addHandler(NullHandler())
+
+import warnings
+warnings.simplefilter('once', category=RuntimeWarning)
+
+warnings.warn("""This is a development branch.
+
+DO NOT:
+  - Expect anything to work.
+  - Expect anything broken to be fixed in a timely manner.
+  - Expect docs.
+  - Expect it to be done anytime soon.
+  - Expect this code to be up to date with the main repo.
+  - Expect help with this fork from randos in the discord.py help channels.
+  - Bother people in the help server for assistance anyways.
+  - Mention the words "machine learning" or "AI" without being able to
+    produce a university email or degree.
+  - Try to use this fork without some degree of python competence.
+    If I see you struggling with basic stuff I will ignore your problem
+    and tell you to learn python.
+
+If you have questions ping Imayhaveborkedit somewhere in the help server and
+ask directly.  For other matters such as comments and concerns relating more
+to the api design post it here instead:
+
+    https://github.com/Rapptz/discord.py/issues/1094
+""", RuntimeWarning, stacklevel=1000)
+
+warnings.simplefilter('default', category=RuntimeWarning)
+del warnings
