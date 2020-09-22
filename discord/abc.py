@@ -440,7 +440,7 @@ class GuildChannel:
         .. versionadded:: 1.3
         """
         category = self.guild.get_channel(self.category_id)
-        return bool(category and category._overwrites == self._overwrites)
+        return bool(category and category.overwrites == self.overwrites)
 
     def permissions_for(self, member):
         """Handles permission resolution for the current :class:`~discord.Member`.
@@ -679,6 +679,9 @@ class GuildChannel:
         Clones this channel. This creates a channel with the same properties
         as this channel.
 
+        You must have the :attr:`~discord.Permissions.manage_channels` permission to
+        do this.
+
         .. versionadded:: 1.1
 
         Parameters
@@ -874,7 +877,7 @@ class Messageable(metaclass=abc.ABCMeta):
                 raise InvalidArgument('file parameter must be File')
 
             try:
-                data = await state.http.send_files(channel.id, files=[file],
+                data = await state.http.send_files(channel.id, files=[file], allowed_mentions=allowed_mentions,
                                                    content=content, tts=tts, embed=embed, nonce=nonce)
             finally:
                 file.close()
@@ -930,15 +933,12 @@ class Messageable(metaclass=abc.ABCMeta):
         """
         return Typing(self)
 
-    @utils.deprecated('fetch_message_fast')
     async def fetch_message(self, id):
         """|coro|
 
         Retrieves a single :class:`~discord.Message` from the destination.
 
         This can only be used by bot accounts.
-
-        Prefer using :meth:`fetch_message_fast`.
 
         Parameters
         ------------
@@ -963,40 +963,6 @@ class Messageable(metaclass=abc.ABCMeta):
         channel = await self._get_channel()
         data = await self._state.http.get_message(channel.id, id)
         return self._state.create_message(channel=channel, data=data)
-
-    async def fetch_message_fast(self, id):
-        """|coro|
-
-        Retrieves a single :class:`~discord.Message` from the destination, using
-        the history endpoint.
-
-        .. versionadded:: 1.5
-
-        Parameters
-        ------------
-        id: :class:`int`
-            The message ID to look for.
-
-        Raises
-        --------
-        ~discord.NotFound
-            The specified channel was not found.
-        ~discord.Forbidden
-            You do not have permissions to get channel message history.
-        ~discord.HTTPException
-            The request to get message history failed.
-
-        Returns
-        --------
-        Optional[:class:`~discord.Message`]
-            The message asked for, or None if there is no match.
-        """
-
-        channel = await self._get_channel()
-        data = await self._state.http.logs_from(channel.id, limit=1, around=id)
-        if data and int(data[0]['id']) == id:
-            return self._state.create_message(channel=channel, data=data[0])
-        return None
 
     async def pins(self):
         """|coro|

@@ -148,8 +148,8 @@ class Member(discord.abc.Messageable, _BaseUser):
     Attributes
     ----------
     joined_at: Optional[:class:`datetime.datetime`]
-        A datetime object that specifies the date and time in UTC that the member joined the guild for
-        the first time. In certain cases, this can be ``None``.
+        A datetime object that specifies the date and time in UTC that the member joined the guild.
+        If the member left and rejoined the guild, this will be the latest date. In certain cases, this can be ``None``.
     activities: Tuple[Union[:class:`BaseActivity`, :class:`Spotify`]]
         The activities that the user is currently doing.
     guild: :class:`Guild`
@@ -198,6 +198,12 @@ class Member(discord.abc.Messageable, _BaseUser):
         author = message.author
         data['user'] = author._to_minimal_user_json()
         return cls(data=data, guild=message.guild, state=message._state)
+
+    def _update_from_message(self, data):
+        self.joined_at = utils.parse_time(data.get('joined_at'))
+        self.premium_since = utils.parse_time(data.get('premium_since'))
+        self._update_roles(data)
+        self.nick = data.get('nick', None)
 
     @classmethod
     def _try_upgrade(cls, *,  data, guild, state):
@@ -433,7 +439,7 @@ class Member(discord.abc.Messageable, _BaseUser):
         guild = self.guild
         if len(self._roles) == 0:
             return guild.default_role
-        
+
         return max(guild.get_role(rid) or guild.default_role for rid in self._roles)
 
     @property
