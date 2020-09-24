@@ -54,6 +54,9 @@ Voice
 .. autoclass:: VoiceClient()
     :members:
 
+.. autoclass:: VoiceProtocol
+    :members:
+
 .. autoclass:: AudioSource
     :members:
 
@@ -904,7 +907,7 @@ of :class:`enum.Enum`.
     is to be interpreted as a system message or a regular message.
 
     .. container:: operations
-    
+
       .. describe:: x == y
 
           Checks if two messages are equal.
@@ -984,6 +987,11 @@ of :class:`enum.Enum`.
     .. attribute:: custom
 
         A custom activity type.
+    .. attribute:: competing
+
+        A competing activity type.
+
+        .. versionadded:: 1.5
 
 .. class:: HypeSquadHouse
 
@@ -2731,6 +2739,11 @@ Widget
 .. autoclass:: Widget()
     :members:
 
+MessageReference
+~~~~~~~~~~~~~~~~~
+.. autoclass:: MessageReference()
+    :members:
+
 RawMessageDeleteEvent
 ~~~~~~~~~~~~~~~~~~~~~~~
 
@@ -2801,6 +2814,18 @@ AllowedMentions
 ~~~~~~~~~~~~~~~~~
 
 .. autoclass:: AllowedMentions
+    :members:
+
+Intents
+~~~~~~~~~~
+
+.. autoclass:: Intents
+    :members:
+
+MemberCacheFlags
+~~~~~~~~~~~~~~~~~~
+
+.. autoclass:: MemberCacheFlags
     :members:
 
 File
@@ -2902,6 +2927,8 @@ The following exceptions are thrown by the library.
 
 .. autoexception:: NotFound
 
+.. autoexception:: DiscordServerError
+
 .. autoexception:: InvalidData
 
 .. autoexception:: InvalidArgument
@@ -2909,6 +2936,8 @@ The following exceptions are thrown by the library.
 .. autoexception:: GatewayNotFound
 
 .. autoexception:: ConnectionClosed
+
+.. autoexception:: PrivilegedIntentsRequired
 
 .. autoexception:: discord.opus.OpusError
 
@@ -2926,8 +2955,10 @@ Exception Hierarchy
                 - :exc:`InvalidArgument`
                 - :exc:`LoginFailure`
                 - :exc:`ConnectionClosed`
+                - :exc:`PrivilegedIntentsRequired`
             - :exc:`NoMoreItems`
             - :exc:`GatewayNotFound`
             - :exc:`HTTPException`
                 - :exc:`Forbidden`
                 - :exc:`NotFound`
+                - :exc:`DiscordServerError`
