@@ -5,7 +5,7 @@
 A Primer to Gateway Intents
 =============================
 
-In version 1.5 comes with the introduction of :class:`Intents`. This is a radical change in how bots are written. An intent basically allows a bot to subscribe into specific buckets of events. The events that correspond to each intent is documented in the individual attribute of the :class:`Intents` documentation.
+In version 1.5 comes the introduction of :class:`Intents`. This is a radical change in how bots are written. An intent basically allows a bot to subscribe into specific buckets of events. The events that correspond to each intent is documented in the individual attribute of the :class:`Intents` documentation.
 
 These intents are passed to the constructor of :class:`Client` or its subclasses (:class:`AutoShardedClient`, :class:`~.AutoShardedBot`, :class:`~.Bot`) with the ``intents`` argument.
 
@@ -21,7 +21,15 @@ For example, if you want a bot that functions without spammy events like presenc
 .. code-block:: python3
 
     import discord
-    intents = discord.Intents(typing=False, presences=False)
+    intents = discord.Intents.default()
+    intents.typing = False
+    intents.presences = False
+
+    # Somewhere else:
+    # client = discord.Client(intents=intents)
+    # or
+    # from discord.ext import commands
+    # bot = commands.Bot(command_prefix='!', intents=intents)
 
 Note that this doesn't enable :attr:`Intents.members` since it's a privileged intent.
 
@@ -33,6 +41,12 @@ Another example showing a bot that only deals with messages and guild informatio
     intents = discord.Intents(messages=True, guilds=True)
     # If you also want reaction events enable the following:
     # intents.reactions = True
+
+    # Somewhere else:
+    # client = discord.Client(intents=intents)
+    # or
+    # from discord.ext import commands
+    # bot = commands.Bot(command_prefix='!', intents=intents)
 
 .. _privileged_intents:
 
@@ -143,14 +157,14 @@ For example:
 .. code-block:: python3
 
     import discord
-    intents = discord.Intents()
+    intents = discord.Intents.default()
     intents.members = True
 
     # Somewhere else:
     # client = discord.Client(intents=intents)
     # or
     # from discord.ext import commands
-    # bot = commands.Bot(intents=intents)
+    # bot = commands.Bot(command_prefix='!', intents=intents)
 
 Why does ``on_ready`` take so long to fire?
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -184,6 +198,6 @@ On Windows use ``py -3`` instead of ``python3``.
 
 .. warning::
 
-    There is no date in which the old gateway will stop working so it is recommended to update your code instead.
+    There is no currently set date in which the old gateway will stop working so it is recommended to update your code instead.
 
 If you truly dislike the direction Discord is going with their API, you can contact them via `support <https://dis.gd/contact>`_

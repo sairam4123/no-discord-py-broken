@@ -622,6 +622,12 @@ def escape_mentions(text):
 
         This does not include channel mentions.
 
+    .. note::
+
+        For more granular control over what mentions should be escaped
+        within messages, refer to the :class:`~discord.AllowedMentions`
+        class.
+
     Parameters
     -----------
     text: :class:`str`

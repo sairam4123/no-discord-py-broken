@@ -137,7 +137,10 @@ class ConnectionState:
             if not isinstance(intents, Intents):
                 raise TypeError('intents parameter must be Intent not %r' % type(intents))
         else:
-            intents = Intents()
+            intents = Intents.default()
+
+        if not intents.guilds:
+            log.warning('Guilds intent seems to be disabled. This may cause state related issues.')
 
         try:
             chunk_guilds = options['fetch_offline_members']
@@ -151,7 +154,7 @@ class ConnectionState:
 
         # Ensure these two are set properly
         if not intents.members and self._chunk_guilds:
-            raise ValueError('Intents.members has be enabled to chunk guilds at startup.')
+            raise ValueError('Intents.members must be enabled to chunk guilds at startup.')
 
         cache_flags = options.get('member_cache_flags', None)
         if cache_flags is None:
@@ -230,6 +233,12 @@ class ConnectionState:
     def self_id(self):
         u = self.user
         return u.id if u else None
+
+    @property
+    def intents(self):
+        ret = Intents.none()
+        ret.value = self._intents.value
+        return ret
 
     @property
     def voice_clients(self):
@@ -725,13 +734,22 @@ class ConnectionState:
         member = Member(guild=guild, data=data, state=self)
         if self._member_cache_flags.joined:
             guild._add_member(member)
-        guild._member_count += 1
+
+        try:
+            guild._member_count += 1
+        except AttributeError:
+            pass
+
         self.dispatch('member_join', member)
 
     def parse_guild_member_remove(self, data):
         guild = self._get_guild(int(data['guild_id']))
         if guild is not None:
-            guild._member_count -= 1
+            try:
+                guild._member_count -= 1
+            except AttributeError:
+                pass
+
             user_id = int(data['user']['id'])
             member = guild.get_member(user_id)
             if member is not None:
