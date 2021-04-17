@@ -70,11 +70,13 @@ class CustomDefault(metaclass=CustomDefaultMeta):
         raise NotImplementedError('Derived classes need to implement this.')
 
 
-class Author(CustomDefault):
+class CurrentAuthor(CustomDefault):
     """Default parameter which returns the author for this context."""
 
     async def default(self, ctx, param):
         return ctx.author
+
+Author = CurrentAuthor
 
 class CurrentChannel(CustomDefault):
     """Default parameter which returns the channel for this context."""
