@@ -509,11 +509,18 @@ class Command(_BaseCommand):
 
     async def _resolve_default(self, ctx, param):
         try:
-            if inspect.isclass(param.default) and issubclass(param.default, defaults.CustomDefault):
-                instance = param.default()
-                return await instance.default(ctx=ctx, param=param)
-            elif isinstance(param.default, defaults.CustomDefault):
-                return await param.default.default(ctx=ctx, param=param)
+            if isinstance(param.default, list) and len(param.default) > 0:
+                if inspect.isclass(param.default[0]) and issubclass(param.default[0], defaults.CustomDefault):
+                    instance = param.default[0]()
+                    return [await instance.default(ctx=ctx, param=param)]
+                elif isinstance(param.default[0], defaults.CustomDefault):
+                    return [await param.default[0].default(ctx=ctx, param=param)]
+            else:
+                if inspect.isclass(param.default) and issubclass(param.default, defaults.CustomDefault):
+                    instance = param.default()
+                    return await instance.default(ctx=ctx, param=param)
+                elif isinstance(param.default, defaults.CustomDefault):
+                    return await param.default.default(ctx=ctx, param=param)
         except CommandError as e:
             raise e
         except Exception as e:
@@ -576,7 +583,7 @@ class Command(_BaseCommand):
                 result.append(value)
 
         if not result and not required:
-            return param.default
+            return await self._resolve_default(ctx, param)
         return result
 
     async def _transform_greedy_var_pos(self, ctx, param, converter):
@@ -589,7 +596,7 @@ class Command(_BaseCommand):
             view.index = previous
             raise RuntimeError() from None # break loop
         else:
-            return value
+            return value or await self._resolve_default(ctx, param)
 
     @property
     def clean_params(self):
